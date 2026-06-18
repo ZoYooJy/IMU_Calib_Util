@@ -139,14 +139,14 @@ void AllanVarianceComputor::allanVariance()
                         for (int m = 0; m < max_bin_size; m++)
                         {
                             // 加速度（m/s²）
-                            current_average[0] += imuBuffer_[j + m].a_ib_b[0];
-                            current_average[1] += imuBuffer_[j + m].a_ib_b[1];
-                            current_average[2] += imuBuffer_[j + m].a_ib_b[2];
+                            current_average[0] += imuBuffer_[j + m].a_ib_b_[0];
+                            current_average[1] += imuBuffer_[j + m].a_ib_b_[1];
+                            current_average[2] += imuBuffer_[j + m].a_ib_b_[2];
 
                             // 角速度（rad/s）
-                            current_average[3] += imuBuffer_[j + m].w_ib_b[0];
-                            current_average[4] += imuBuffer_[j + m].w_ib_b[1];
-                            current_average[5] += imuBuffer_[j + m].w_ib_b[2];
+                            current_average[3] += imuBuffer_[j + m].w_ib_b_[0];
+                            current_average[4] += imuBuffer_[j + m].w_ib_b_[1];
+                            current_average[5] += imuBuffer_[j + m].w_ib_b_[2];
                         }
 
                         // 求均值

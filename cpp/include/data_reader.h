@@ -2,7 +2,7 @@
  * @Author: ZoYooJy zhouyujie_gdut@163.com
  * @Date: 2026-06-17 11:34:58
  * @LastEditors: ZoYooJy zhouyujie_gdut@163.com
- * @LastEditTime: 2026-06-18 11:26:43
+ * @LastEditTime: 2026-06-18 15:49:51
  * @FilePath: /IMU_Calib_Util/cpp/include/data_reader.h
  */
 #pragma once
@@ -36,9 +36,9 @@ class DataReader
     /**
      * @brief 读取 IMU 数据文件，将解析结果填充到 imuBuffer
      *
-     * @param _imuBuffer 输出的 IMU 测量数据缓冲区
+     * @param _imu_buffer 输出的 IMU 测量数据缓冲区
      */
-    void run(EigenVector<ImuMeasurement> &_imuBuffer);
+    void run(EigenVector<ImuMeasurement> &_imu_buffer);
 
   private:
     /**

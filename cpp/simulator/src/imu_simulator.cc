@@ -20,11 +20,16 @@
 namespace imu_simulator
 {
 
-/// 从 YAML 节点中安全读取参数，仅当键存在时更新值
-/// @param node  YAML 节点
-/// @param param 参数键名
-/// @param value 输出值，键存在时被更新
-/// @return 是否成功读取
+/**
+ * @brief 从 YAML 节点中安全读取参数，仅当键存在时更新值
+ *
+ * @tparam T
+ * @param node YAML 节点
+ * @param param 参数键名
+ * @param value 输出值，键存在时被更新
+ * @return true
+ * @return false
+ */
 template <class T> static bool get(const YAML::Node &node, const std::string &param, T &value)
 {
     if (!node[param])
@@ -35,12 +40,9 @@ template <class T> static bool get(const YAML::Node &node, const std::string &pa
     return true;
 }
 
-/// 加载 YAML 配置文件
-/// @param filename 文件路径
-/// @return YAML 节点
-static YAML::Node loadYamlFile(const std::string &filename)
+static YAML::Node loadYamlFile(const std::string &_filename)
 {
-    if (filename.empty())
+    if (_filename.empty())
     {
         throw std::invalid_argument("Filename is empty!");
     }
@@ -48,26 +50,26 @@ static YAML::Node loadYamlFile(const std::string &filename)
     YAML::Node node;
     try
     {
-        node = YAML::LoadFile(filename);
+        node = YAML::LoadFile(_filename);
     }
     catch (...)
     {
-        throw std::invalid_argument("Error reading config file: " + filename);
+        throw std::invalid_argument("Error reading config file: " + _filename);
     }
 
     if (node.IsNull())
     {
-        throw std::invalid_argument("Error reading config file: " + filename);
+        throw std::invalid_argument("Error reading config file: " + _filename);
     }
 
-    std::cout << "[INFO] 成功读取配置文件: " << filename << std::endl;
+    std::cout << "[INFO] 成功读取配置文件: " << _filename << std::endl;
     return node;
 }
 
-ImuSimulator::ImuSimulator(const std::string &config_file)
+ImuSimulator::ImuSimulator(const std::string &_config_file)
 {
     // 加载 YAML 配置文件
-    YAML::Node config = loadYamlFile(config_file);
+    YAML::Node config = loadYamlFile(_config_file);
 
     // 读取加速度计噪声参数
     get(config, "accelerometer_noise_density", accelerometer_noise_density_);
@@ -100,21 +102,21 @@ ImuSimulator::ImuSimulator(const std::string &config_file)
     std::cout << "[INFO] output_path: " << output_path_ << std::endl;
 }
 
-Eigen::Vector3d ImuSimulator::randomNormalDistributionVector(double sigma)
+Eigen::Vector3d ImuSimulator::randomNormalDistributionVector(double _sigma)
 {
     // 使用 C++11 随机数引擎，thread_local 保证线程安全且避免重复构造
     thread_local std::mt19937 rng{std::random_device{}()};
     thread_local std::normal_distribution<double> nd{0.0, 1.0};
 
-    return {sigma * nd(rng), sigma * nd(rng), sigma * nd(rng)};
+    return {_sigma * nd(rng), _sigma * nd(rng), _sigma * nd(rng)};
 }
 
-void ImuSimulator::writeMeasurement(std::ofstream &file, const SimImuMeasurement &meas)
+void ImuSimulator::writeMeasurement(std::ofstream &_file, const SimImuMeasurement &_meas)
 {
     // 格式：t gyro_x gyro_y gyro_z acc_x acc_y acc_z
     // 单位：t(s), gyro(rad/s), acc(m/s²)
-    file << std::setprecision(19) << meas.t << " " << meas.gyro.x() << " " << meas.gyro.y() << " " << meas.gyro.z()
-         << " " << meas.acc.x() << " " << meas.acc.y() << " " << meas.acc.z() << std::endl;
+    _file << std::setprecision(19) << _meas.t << " " << _meas.gyro.x() << " " << _meas.gyro.y() << " " << _meas.gyro.z()
+          << " " << _meas.acc.x() << " " << _meas.acc.y() << " " << _meas.acc.z() << std::endl;
 }
 
 void ImuSimulator::run()

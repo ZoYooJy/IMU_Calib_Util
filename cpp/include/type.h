@@ -1,3 +1,10 @@
+/*
+ * @Author: ZoYooJy zhouyujie_gdut@163.com
+ * @Date: 2026-06-17 11:32:28
+ * @LastEditors: ZoYooJy zhouyujie_gdut@163.com
+ * @LastEditTime: 2026-06-18 15:46:42
+ * @FilePath: /IMU_Calib_Util/cpp/include/type.h
+ */
 #pragma once
 
 #include <Eigen/Core>
@@ -25,7 +32,7 @@ inline double ns2s(uint64_t t)
 /// 使用 Eigen 对齐分配器的 vector，避免固定大小 Eigen 向量的内存对齐问题
 template <class T> using EigenVector = std::vector<T, Eigen::aligned_allocator<T>>;
 
-/// 原始 IMU 数据写入格式（预留，当前未实际使用）
+/// 原始 IMU 数据写入格式
 struct ImuFormat
 {
     double time;  ///< 时间戳（秒）

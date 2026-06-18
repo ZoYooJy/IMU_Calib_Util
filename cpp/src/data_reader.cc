@@ -78,9 +78,9 @@ bool DataReader::parseLineLSB(const std::string &line, ImuMeasurement &meas)
         double acc_z = acc_z_bit * accCoef_;  // m/s²
 
         // 构造 ImuMeasurement
-        meas.t = s2ns(t_sec); // 秒转纳秒
-        meas.a_ib_b = Eigen::Vector3d(acc_x, acc_y, acc_z);
-        meas.w_ib_b = Eigen::Vector3d(gyr_x, gyr_y, gyr_z);
+        meas.t_ = s2ns(t_sec); // 秒转纳秒
+        meas.a_ib_b_ = Eigen::Vector3d(acc_x, acc_y, acc_z);
+        meas.w_ib_b_ = Eigen::Vector3d(gyr_x, gyr_y, gyr_z);
 
         return true;
     }
@@ -127,9 +127,9 @@ bool DataReader::parseLineNormal(const std::string &line, ImuMeasurement &meas)
         double acc_y = std::stod(fields[5]);
         double acc_z = std::stod(fields[6]);
 
-        meas.t = s2ns(t_sec);
-        meas.a_ib_b = Eigen::Vector3d(acc_x, acc_y, acc_z);
-        meas.w_ib_b = Eigen::Vector3d(gyr_x, gyr_y, gyr_z);
+        meas.t_ = s2ns(t_sec);
+        meas.a_ib_b_ = Eigen::Vector3d(acc_x, acc_y, acc_z);
+        meas.w_ib_b_ = Eigen::Vector3d(gyr_x, gyr_y, gyr_z);
 
         return true;
     }
@@ -140,7 +140,7 @@ bool DataReader::parseLineNormal(const std::string &line, ImuMeasurement &meas)
     }
 }
 
-void DataReader::run(EigenVector<ImuMeasurement> &imuBuffer)
+void DataReader::run(EigenVector<ImuMeasurement> &_imu_buffer)
 {
     std::ifstream file(imu_file_);
     if (!file.is_open())
@@ -179,7 +179,7 @@ void DataReader::run(EigenVector<ImuMeasurement> &imuBuffer)
         imu_counter++;
 
         // 时长截断：sequence_time_ >= 0 时，超过此时长的数据不再读取；-1 表示读取全部数据
-        double elapsed_seconds = ns2s(meas.t - (firstMsg ? meas.t : firstTime));
+        double elapsed_seconds = ns2s(meas.t_ - (firstMsg ? meas.t_ : firstTime));
         if (!firstMsg && sequence_time_ >= 0 && elapsed_seconds > sequence_time_)
         {
             break;
@@ -188,7 +188,7 @@ void DataReader::run(EigenVector<ImuMeasurement> &imuBuffer)
         // 每 60 秒打印一次进度
         if (std::difftime(std::clock(), start) / CLOCKS_PER_SEC >= 60.0)
         {
-            double current_elapsed = firstMsg ? 0.0 : ns2s(meas.t - firstTime);
+            double current_elapsed = firstMsg ? 0.0 : ns2s(meas.t_ - firstTime);
             APP_INFO("[INFO] Loaded " << current_elapsed << " / " << sequence_time_ << " s");
             start = std::clock();
         }
@@ -197,27 +197,27 @@ void DataReader::run(EigenVector<ImuMeasurement> &imuBuffer)
         if (firstMsg)
         {
             firstMsg = false;
-            firstTime = meas.t;
-            lastImuTime = meas.t;
+            firstTime = meas.t_;
+            lastImuTime = meas.t_;
         }
 
         // 时间乱序检测
-        if (meas.t < lastImuTime)
+        if (meas.t_ < lastImuTime)
         {
             skipped_imu++;
-            APP_ERROR("[ERROR] IMU timestamp out of order. Current(ns): " << meas.t - firstTime << " Previous(ns): "
+            APP_ERROR("[ERROR] IMU timestamp out of order. Current(ns): " << meas.t_ - firstTime << " Previous(ns): "
                                                                           << lastImuTime - firstTime << " (dropped "
                                                                           << skipped_imu << ")");
             continue;
         }
-        lastImuTime = meas.t;
+        lastImuTime = meas.t_;
 
-        imuBuffer.push_back(meas);
+        _imu_buffer.push_back(meas);
     }
 
     file.close();
 
-    APP_INFO("[INFO] Data collection done, " << imuBuffer.size() << " measurements loaded");
+    APP_INFO("[INFO] Data collection done, " << _imu_buffer.size() << " measurements loaded");
     if (skipped_imu > 0)
     {
         APP_ERROR("[WARN] Skipped " << skipped_imu << " messages due to out-of-order timestamps");

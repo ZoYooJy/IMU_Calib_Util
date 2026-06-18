@@ -1,33 +1,37 @@
+/*
+ * @Author: ZoYooJy zhouyujie_gdut@163.com
+ * @Date: 2026-06-17 11:36:21
+ * @LastEditors: ZoYooJy zhouyujie_gdut@163.com
+ * @LastEditTime: 2026-06-18 15:45:19
+ * @FilePath: /IMU_Calib_Util/cpp/src/imu_meas.cc
+ */
 
 #include "imu_meas.h"
 
 namespace allan_variance
 {
 
-/// 默认构造函数，加速度和角速度初始化为零
-ImuMeasurement::ImuMeasurement() : a_ib_b(0, 0, 0), w_ib_b(0, 0, 0)
+ImuMeasurement::ImuMeasurement() : a_ib_b_(Eigen::Vector3d::Zero()), w_ib_b_(Eigen::Vector3d::Zero())
 {
 }
 
-/// 带参数构造函数
-ImuMeasurement::ImuMeasurement(const uint64_t _t, const Eigen::Vector3d &_I_a_WI, const Eigen::Vector3d &_I_w_WI)
+ImuMeasurement::ImuMeasurement(const uint64_t _t, const Eigen::Vector3d &_a_ib_b, const Eigen::Vector3d &_w_ib_b)
 {
-    t = _t;
-    a_ib_b = _I_a_WI;
-    w_ib_b = _I_w_WI;
+    t_ = _t;
+    a_ib_b_ = _a_ib_b;
+    w_ib_b_ = _w_ib_b;
 }
 
-/// 析构函数
+
 ImuMeasurement::~ImuMeasurement()
 {
 }
 
-/// 输出流操作符，打印 IMU 测量数据
 std::ostream &operator<<(std::ostream &stream, const ImuMeasurement &meas)
 {
-    stream << "IMU Measurement at time = " << meas.t << " : \n"
-           << "a_ib_b: " << meas.a_ib_b.transpose() << "\n"
-           << "w_ib_b: " << meas.w_ib_b.transpose() << "\n";
+    stream << "IMU Measurement at time = " << meas.t_ << " : \n"
+           << "a_ib_b: " << meas.a_ib_b_.transpose() << "\n"
+           << "w_ib_b: " << meas.w_ib_b_.transpose() << "\n";
     return stream;
 }
 

@@ -2,7 +2,7 @@
  * @Author: ZoYooJy zhouyujie_gdut@163.com
  * @Date: 2026-06-17 13:56:58
  * @LastEditors: ZoYooJy zhouyujie_gdut@163.com
- * @LastEditTime: 2026-06-17 18:11:01
+ * @LastEditTime: 2026-06-18 15:36:39
  * @FilePath: /IMU_Calib_Util/cpp/simulator/include/imu_simulator.h
  */
 #pragma once
@@ -32,25 +32,37 @@ struct SimImuMeasurement
 class ImuSimulator
 {
   public:
-    /// 构造函数，从 YAML 配置文件加载噪声参数
-    /// @param config_file  simu_config.yaml 文件路径
+    /**
+     * @brief 从 YAML 配置文件加载噪声参数
+     *
+     *
+     * @param config_file simu_config.yaml 文件路径
+     */
     ImuSimulator(const std::string &config_file);
 
-    /// 运行仿真，生成 IMU 数据并写入输出文件
+    /**
+     * @brief 运行仿真，生成 IMU 数据并写入输出文件
+     *
+     */
     void run();
 
   private:
-      /// 生成三维正态分布随机向量（各分量独立，标准差为 sigma）
-    /// @param sigma 各分量的标准差
-    /// @return 三维随机向量
-    Eigen::Vector3d randomNormalDistributionVector(double sigma);
+    /**
+     * @brief 生成三维正态分布随机向量（各分量独立，标准差为 sigma）
+     *
+     * @param _sigma 各分量的标准差
+     * @return 三维随机向量
+     */
+    Eigen::Vector3d randomNormalDistributionVector(double _sigma);
 
-    /// 将一条仿真数据写入输出文件
-    /// 格式：t gyro_x gyro_y gyro_z acc_x acc_y acc_z
-    /// 单位：t(s), gyro(rad/s), acc(m/s²)
-    /// @param file   输出文件流
-    /// @param meas   仿真测量数据
-    void writeMeasurement(std::ofstream &file, const SimImuMeasurement &meas);
+    /**
+     * @brief 将一条仿真数据写入输出文件
+     * 格式：t gyro_x gyro_y gyro_z acc_x acc_y acc_z, [t(s), gyro(rad/s), acc(m/s²)]
+     *
+     * @param _file 输出文件流
+     * @param _meas 仿真测量数据
+     */
+    void writeMeasurement(std::ofstream &_file, const SimImuMeasurement &_meas);
 
     /// 加速度计噪声密度（白噪声标准差，m/s²/√Hz 或 m/s²·s^0.5）
     double accelerometer_noise_density_;

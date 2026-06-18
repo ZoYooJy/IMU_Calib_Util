@@ -2,7 +2,7 @@
  * @Author: ZoYooJy zhouyujie_gdut@163.com
  * @Date: 2026-06-17 14:35:51
  * @LastEditors: ZoYooJy zhouyujie_gdut@163.com
- * @LastEditTime: 2026-06-18 14:13:36
+ * @LastEditTime: 2026-06-18 15:47:59
  * @FilePath: /IMU_Calib_Util/cpp/src/yaml_parser.cc
  */
 #include "yaml_parser.h"
@@ -13,12 +13,6 @@
 namespace allan_variance
 {
 
-/**
- * @brief 加载 YAML 配置文件
- *
- * @param _filename 文件路径
- * @return YAML::Node YAML 节点
- */
 YAML::Node loadYamlFile(const std::string &_filename)
 {
     if (_filename.empty())
