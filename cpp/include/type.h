@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
+#include <map>
 #include <vector>
 
 namespace allan_variance
@@ -61,5 +62,13 @@ struct AllanVarianceFormat
              << " " << gyroX << " " << gyroY << " " << gyroZ << " " << std::endl;
     }
 };
+
+enum class InputDataType
+{
+    LSB,    //
+    NORMAL, //
+};
+
+const std::map<unsigned int, InputDataType> input_type_map = {{1, InputDataType::LSB}, {2, InputDataType::NORMAL}};
 
 } // namespace allan_variance

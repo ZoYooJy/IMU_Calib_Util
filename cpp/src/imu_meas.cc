@@ -5,7 +5,7 @@ namespace allan_variance
 {
 
 /// 默认构造函数，加速度和角速度初始化为零
-ImuMeasurement::ImuMeasurement() : I_a_WI(0, 0, 0), I_w_WI(0, 0, 0)
+ImuMeasurement::ImuMeasurement() : a_ib_b(0, 0, 0), w_ib_b(0, 0, 0)
 {
 }
 
@@ -13,8 +13,8 @@ ImuMeasurement::ImuMeasurement() : I_a_WI(0, 0, 0), I_w_WI(0, 0, 0)
 ImuMeasurement::ImuMeasurement(const uint64_t _t, const Eigen::Vector3d &_I_a_WI, const Eigen::Vector3d &_I_w_WI)
 {
     t = _t;
-    I_a_WI = _I_a_WI;
-    I_w_WI = _I_w_WI;
+    a_ib_b = _I_a_WI;
+    w_ib_b = _I_w_WI;
 }
 
 /// 析构函数
@@ -26,8 +26,8 @@ ImuMeasurement::~ImuMeasurement()
 std::ostream &operator<<(std::ostream &stream, const ImuMeasurement &meas)
 {
     stream << "IMU Measurement at time = " << meas.t << " : \n"
-           << "I_a_WI: " << meas.I_a_WI.transpose() << "\n"
-           << "I_w_WI: " << meas.I_w_WI.transpose() << "\n";
+           << "a_ib_b: " << meas.a_ib_b.transpose() << "\n"
+           << "w_ib_b: " << meas.w_ib_b.transpose() << "\n";
     return stream;
 }
 

@@ -1,10 +1,10 @@
-
-/**
- * @file   main.cc
- * @brief  Allan 方差计算工具主入口
- * @author Russell Buchanan (original), modified for non-ROS version
+/*
+ * @Author: ZoYooJy zhouyujie_gdut@163.com
+ * @Date: 2026-06-17 14:34:04
+ * @LastEditors: ZoYooJy zhouyujie_gdut@163.com
+ * @LastEditTime: 2026-06-18 14:51:33
+ * @FilePath: /IMU_Calib_Util/cpp/src/main.cc
  */
-
 #include <atomic>
 #include <csignal>
 #include <ctime>
@@ -57,39 +57,43 @@ int main(int argc, char **argv)
     }
 
     // 从配置文件读取参数
-    std::string imu_file;
-    std::string output_path;
+    std::string input_folder_path, file_name;
+    std::string output_folder_path;
 
-    allan_variance::get(config, "imu_file", imu_file);
-    allan_variance::get(config, "output_path", output_path);
+    allan_variance::get(config, "input_folder_path", input_folder_path);
+    allan_variance::get(config, "file_name", file_name);
+    allan_variance::get(config, "output_folder_path", output_folder_path);
 
-    if (imu_file.empty())
+    auto file_full_path = input_folder_path + "/" + file_name;
+    if (file_full_path.empty())
     {
-        APP_ERROR("[ERROR] imu_file not specified in config");
+        APP_ERROR("[ERROR] imu file not specified in config");
         return 1;
     }
-    if (output_path.empty())
+
+    if (output_folder_path.empty())
     {
-        output_path = ""; // TODO 默认输出到与imu_file相同的目录
+        output_folder_path = input_folder_path;
     }
 
     // 确保输出目录存在
-    fs::path out_dir = fs::absolute(fs::path(output_path));
+    fs::path out_dir = fs::absolute(fs::path(output_folder_path));
     if (!fs::exists(out_dir))
     {
         APP_INFO("[INFO] Creating output directory: " << out_dir.string());
         fs::create_directories(out_dir);
     }
 
-    APP_INFO("[INFO] IMU data file: " << imu_file);
+    APP_INFO("[INFO] IMU data file: " << file_full_path);
     APP_INFO("[INFO] Output path: " << out_dir.string());
 
     // 创建 Allan 方差计算器并执行计算
     allan_variance::AllanVarianceComputor computor(config_file, out_dir.string());
-    APP_INFO("[INFO] Allan variance computor initialized");
+
+    APP_INFO("[INFO] ========== Allan variance computor initialized ==========");
 
     std::clock_t start = std::clock();
-    computor.run(imu_file);
+    computor.run(file_full_path);
     double durationTime = (std::clock() - start) / static_cast<double>(CLOCKS_PER_SEC);
 
     APP_INFO("[INFO] Total computation time: " << durationTime << " s");

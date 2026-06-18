@@ -1,7 +1,12 @@
-imu_file: /Users/zyj/Documents/TODO/IMU_Calib_Util/dataset/
-output_path: /Users/zyj/Documents/TODO/IMU_Calib_Util/output
+input_folder_path: /Users/zyj/Documents/TODO/IMU_Calib_Util/dataset
+file_name: bmi323_static.DAT
+output_folder_path: /Users/zyj/Documents/TODO/IMU_Calib_Util/output
 
 # imu params
 imu_rate: 100
 sequence_time: -1
 overlap: 0.0
+
+# 1: LSB
+# 2: rad/s & m/s^2
+data_type: 1

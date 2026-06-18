@@ -1,0 +1,11 @@
+#
+data_dir: /Users/zyj/Documents/TODO/IMU_Calib_Util/cpp/simulator/output
+
+#
+fig_dir: /Users/zyj/Documents/TODO/IMU_Calib_Util/cpp/simulator/output
+
+#
+param_dir: /Users/zyj/Documents/TODO/IMU_Calib_Util/cpp/simulator/output
+
+# default 1, dont skip.
+skip: 1

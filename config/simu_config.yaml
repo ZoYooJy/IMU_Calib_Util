@@ -1,0 +1,12 @@
+input_folder_path: /Users/zyj/Documents/TODO/IMU_Calib_Util/cpp/simulator/dataset
+file_name: imu_simulate.txt
+output_folder_path: /Users/zyj/Documents/TODO/IMU_Calib_Util/cpp/simulator/output
+
+# imu params
+imu_rate: 100
+sequence_time: -1
+overlap: 0.0
+
+# 1: LSB
+# 2: rad/s & m/s^2
+data_type: 2

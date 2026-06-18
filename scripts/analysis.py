@@ -1,13 +1,26 @@
+'''
+Author: ZoYooJy zhouyujie_gdut@163.com
+Date: 2026-06-16 19:19:25
+LastEditors: ZoYooJy zhouyujie_gdut@163.com
+LastEditTime: 2026-06-17 17:28:33
+FilePath: /IMU_Calib_Util/scripts/analysis.py
+'''
 #!/usr/bin/env python3
 
 """
 @file   analysis.py
-@brief  Plotting and analysis tool to determine IMU parameters.
-@author Russell Buchanan
+@brief  Allan deviation analysis and IMU noise parameter fitting tool.
+        Reads allan_variance.csv, extracts white noise, bias instability,
+        and random walk parameters. Plots Allan deviation curves and
+        outputs calibration parameters to the terminal.
+
+Usage:
+    python3 analysis.py --cfg analysis_cfg.yaml
 """
 
 import argparse
 import csv
+import os
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,33 +28,22 @@ from scipy.optimize import curve_fit
 
 
 def line_func(x, m, b):
-	"""
-	Linear function to fit the data.
-
-	Args:
-		x (np.array): The x values to fit.
-		m (float): The slope of the line.
-		b (float): The y-intercept of the line.
-
-	Returns:
-		np.array: The y values of the line.
-	"""
+	"""Linear function y = m*x + b, used for fitting in log space"""
 	return m * x + b
 
 def get_intercept(x, y, m, b):
 	"""
-	Get the intercept of the line.
+	In log-log space, fit data with a line of fixed slope m, return y at x=b.
 
 	Args:
-		x (np.array): The x values to fit.
-		y (np.array): The y values to fit.
-		m (float): The slope of the line.
-		b (float): The y-intercept of the line.
+		x (np.array): x data (Allan deviation period)
+		y (np.array): y data (Allan deviation value)
+		m (float): Fixed slope of the fitting line
+		b (float): x value at which to compute the intercept
 
 	Returns:
-		float: The y-intercept of the line.
+		tuple: (intercept value yfit(b), fitting function yfit)
 	"""
-
 	logx = np.log(x)
 	logy = np.log(y)
 	coeffs, _ = curve_fit(line_func, logx, logy, bounds=([m, -np.inf], [m + 0.001, np.inf]))
@@ -53,75 +55,103 @@ def get_intercept(x, y, m, b):
 
 def generate_prediction(tau, q_quantization=0, q_white=0, q_bias_instability=0, q_walk=0, q_ramp=0):
 	"""
-	Generate a prediction of the Allan deviation.
+	Generate Allan deviation prediction curve based on the five-term noise model.
 
 	Args:
-		tau (np.array): The time periods to predict.
-		q_quantization (float): The quantization noise.
-		q_white (float): The white noise.
-		q_bias_instability (float): The bias instability.
-		q_walk (float): The random walk.
-		q_ramp (float): The ramp.
+		tau (np.array): Sampling period
+		q_quantization (float): Quantization noise
+		q_white (float): White noise (velocity/angle random walk)
+		q_bias_instability (float): Bias instability
+		q_walk (float): Random walk (rate random walk)
+		q_ramp (float): Rate ramp
+
+	Returns:
+		np.array: Predicted Allan deviation values
 	"""
 	n = len(tau)
 
-	# Create the matrix A
+	# Build coefficient matrix A for the five-term noise model
 	A = np.empty((n, 5))
-	A[:, 0] = 3 / tau**2
-	A[:, 1] = 1 / tau
-	A[:, 2] = 2 * np.log(2) / np.pi
-	A[:, 3] = tau / 3
-	A[:, 4] = tau**2 / 2
+	A[:, 0] = 3 / tau**2         # Quantization noise term
+	A[:, 1] = 1 / tau            # White noise term
+	A[:, 2] = 2 * np.log(2) / np.pi  # Bias instability term
+	A[:, 3] = tau / 3            # Random walk term
+	A[:, 4] = tau**2 / 2         # Rate ramp term
 
-	# Create the parameters vector
+	# Parameter vector
 	params = np.array([q_quantization ** 2, q_white ** 2, q_bias_instability ** 2, q_walk ** 2, q_ramp ** 2])
 
-	# Calculate the Allan deviation
 	return np.sqrt(A.dot(params))
 
-# Parse command line arguments
-parser = argparse.ArgumentParser()
-parser.add_argument('--data', metavar='STR', type=str, help='TUM data files to plot')
-parser.add_argument('--config', metavar='STR', type=str, help='yaml config file')
-parser.add_argument("--skip", type=int, default=1)
-parser.add_argument("--output", type=str, default="imu.yaml")
+
+# ==================== Command-line argument parsing ====================
+parser = argparse.ArgumentParser(description="Allan deviation analysis and IMU noise parameter fitting tool")
+parser.add_argument('--cfg', metavar='STR', type=str, required=True,
+                    help='Path to analysis_cfg.yaml (required)')
 args = parser.parse_args()
 
-# Load config file if provided
-rostopic = "/sensors/imu"
-update_rate = 400.0
-if args.config:
-	import yaml #pip install pyyaml
-	with open(args.config, "r") as stream:
-		config = yaml.safe_load(stream)
-	rostopic = config["imu_topic"]
-	update_rate = config["imu_rate"]
+# ==================== Load configuration file ====================
+import yaml  # pip install pyyaml
 
-# Assumes tum format
-# Initialize arrays
+with open(args.cfg, "r") as stream:
+	cfg = yaml.safe_load(stream)
+
+# Data directory: contains allan_variance.csv
+data_dir = cfg.get("data_dir", ".")
+# Figure save directory
+fig_dir = cfg.get("fig_dir", ".")
+# Calibration parameter save directory (reserved)
+param_dir = cfg.get("param_dir", ".")
+# Data skip interval
+skip = cfg.get("skip", 1)
+
+data_file = os.path.join(data_dir, "allan_variance.csv")
+
+# Ensure output directories exist
+os.makedirs(fig_dir, exist_ok=True)
+os.makedirs(param_dir, exist_ok=True)
+
+print(f"[INFO] Config file: {args.cfg}")
+print(f"[INFO] Data file: {data_file}")
+print(f"[INFO] Figure save directory: {fig_dir}")
+print(f"[INFO] Parameter save directory: {param_dir}")
+print(f"[INFO] Data skip interval: {skip}")
+
+# ==================== Read Allan deviation data ====================
+# CSV format (space-delimited): period, accX, accY, accZ, gyroX, gyroY, gyroZ
 period = np.array([])
-acceleration = np.empty((0,3), float)
-rotation_rate = np.empty((0,3), float)
+acceleration = np.empty((0, 3), float)
+rotation_rate = np.empty((0, 3), float)
 
-# Read data from file
-with open(args.data) as input_file:
+with open(data_file) as input_file:
 	csv_reader = csv.reader(input_file, delimiter=' ')
 	counter = 0
 
 	for row in csv_reader:
-		counter = counter + 1
-		if (counter % args.skip != 0):
+		# Skip empty lines
+		if len(row) == 0:
 			continue
-		# Data is in the format:
-		# period, accel_x_allan_deviation, accel_y_allan_deviation, accel_z_allan_deviation, gyro_x_allan_deviation, gyro_y_allan_deviation, gyro_z_allan_deviation
+		# Filter out rows containing only empty strings
+		row = [r for r in row if r.strip() != '']
+		if len(row) < 7:
+			continue
+
+		counter = counter + 1
+		if (counter % skip != 0):
+			continue
+
 		t = float(row[0])
 		period = np.append(period, [t], axis=0)
-		acceleration = np.append(acceleration, np.array([float(row[1]), float(row[2]), float(row[3])]).reshape(1,3), axis=0)
-		rotation_rate = np.append(rotation_rate, np.array([float(row[4]), float(row[5]), float(row[6])]).reshape(1,3), axis=0)
+		acceleration = np.append(acceleration, np.array([float(row[1]), float(row[2]), float(row[3])]).reshape(1, 3), axis=0)
+		rotation_rate = np.append(rotation_rate, np.array([float(row[4]), float(row[5]), float(row[6])]).reshape(1, 3), axis=0)
 
-# Calculate intercepts and minimums for accelerometer
+print(f"[INFO] Loaded {len(period)} data points, period range: {period[0]:.2f}s ~ {period[-1]:.2f}s")
+
+
+# Calculate intercepts and minimums
 white_noise_break_point = np.where(period == 10)[0][0]
-random_rate_break_point = np.where(period == 10)[0][0]
+
+# ==================== Accel Data ====================
 
 # White Noise Intercept with a line of the form y = -0.5 * x + 1.0
 accel_wn_intercept_x, xfit_wn = get_intercept(period[0:white_noise_break_point], acceleration[0:white_noise_break_point,0], -0.5, 1.0)
@@ -145,31 +175,29 @@ accel_min_z_index = np.argmin(acceleration[:,2])
 worst_accel_white_noise = np.amax([accel_wn_intercept_x, accel_wn_intercept_y, accel_wn_intercept_z])
 worst_accel_random_walk = np.amax([accel_rr_intercept_x, accel_rr_intercept_y, accel_rr_intercept_z])
 
-# Write to yaml file
-yaml_file = open(args.output, "w")
-yaml_file.write("#Accelerometer\n")
-yaml_file.write("accelerometer_noise_density: " + repr(worst_accel_white_noise) + " \n")
-yaml_file.write("accelerometer_random_walk: " + repr(worst_accel_random_walk) + " \n")
-yaml_file.write("\n")
-
-print("ACCELEROMETER:")
-print(f"X Velocity Random Walk: {accel_wn_intercept_x: .5f} m/s/sqrt(s) {accel_wn_intercept_x*60: .5f} m/s/sqrt(hr)")
-print(f"Y Velocity Random Walk: {accel_wn_intercept_y: .5f} m/s/sqrt(s) {accel_wn_intercept_y*60: .5f} m/s/sqrt(hr)")
-print(f"Z Velocity Random Walk: {accel_wn_intercept_z: .5f} m/s/sqrt(s) {accel_wn_intercept_z*60: .5f} m/s/sqrt(hr)")
-
-print(f"X Bias Instability: {accel_min_x: .5f} m/s^2 {accel_min_x*3600*3600: .5f} m/hr^2")
-print(f"Y Bias Instability: {accel_min_y: .5f} m/s^2 {accel_min_y*3600*3600: .5f} m/hr^2")
-print(f"Z Bias Instability: {accel_min_z: .5f} m/s^2 {accel_min_z*3600*3600: .5f} m/hr^2")
-
-print(f"X Accel Random Walk: {accel_rr_intercept_x: .5f} m/s^2/sqrt(s)")
-print(f"Y Accel Random Walk: {accel_rr_intercept_y: .5f} m/s^2/sqrt(s)")
-print(f"Z Accel Random Walk: {accel_rr_intercept_z: .5f} m/s^2/sqrt(s)")
-
 average_acc_white_noise = (accel_wn_intercept_x + accel_wn_intercept_y + accel_wn_intercept_z) / 3
 average_acc_bias_instability = (accel_min_x + accel_min_y + accel_min_z) / 3
 average_acc_random_walk = (accel_rr_intercept_x + accel_rr_intercept_y + accel_rr_intercept_z) / 3
 
-# Plot accelerometer data
+print("ACCELEROMETER:")
+print(f"X Accel Noise Density: {accel_wn_intercept_x: .5f} m/s^2/sqrt(Hz)")
+print(f"Y Accel Noise Density: {accel_wn_intercept_y: .5f} m/s^2/sqrt(Hz)")
+print(f"Z Accel Noise Density: {accel_wn_intercept_z: .5f} m/s^2/sqrt(Hz)")
+print(f"Accel Noise Density Mean: {average_acc_white_noise: .5f} m/s^2/sqrt(Hz)")
+
+print(f"X Accel Random Walk: {accel_rr_intercept_x: .5f} m/s^3/sqrt(Hz)")
+print(f"Y Accel Random Walk: {accel_rr_intercept_y: .5f} m/s^3/sqrt(Hz)")
+print(f"Z Accel Random Walk: {accel_rr_intercept_z: .5f} m/s^3/sqrt(Hz)")
+print(f"Z Accel Random Walk Mean: {average_acc_random_walk: .5f} m/s^3/sqrt(Hz)")
+
+print(f"X Accel Bias Instability: {accel_min_x: .5f} m/s^2")
+print(f"Y Accel Bias Instability: {accel_min_y: .5f} m/s^2")
+print(f"Z Accel Bias Instability: {accel_min_z: .5f} m/s^2")
+print(f"Z Accel Bias Instability Mean: {average_acc_bias_instability: .5f} m/s^2")
+
+
+### plot
+
 dpi = 90
 figsize = (16, 9)
 fig1 = plt.figure(num="Acceleration", dpi=dpi, figsize=figsize)
@@ -214,7 +242,9 @@ plt.pause(1)
 w = plt.waitforbuttonpress(timeout=5)
 plt.close()
 
-fig1.savefig('acceleration.png', dpi=600, bbox_inches = "tight")
+fig1.savefig(os.path.join(fig_dir, 'acceleration.png'), dpi=600, bbox_inches = "tight")
+
+# ==================== Gyro Data ====================
 
 # Calculate intercepts and minimums for gyroscope
 gyro_wn_intercept_x, xfit_wn = get_intercept(period[0:white_noise_break_point], rotation_rate[0:white_noise_break_point,0], -0.5, 1.0)
@@ -237,31 +267,31 @@ gyro_min_z_index = np.argmin(rotation_rate[:,2])
 worst_gyro_white_noise = np.amax([gyro_wn_intercept_x, gyro_wn_intercept_y, gyro_wn_intercept_z])
 worst_gyro_random_walk = np.amax([gyro_rr_intercept_x, gyro_rr_intercept_y, gyro_rr_intercept_z])
 
-# Write gyroscope parameters to yaml file
-yaml_file.write("#Gyroscope\n")
-# Convert back to radians here
-yaml_file.write("gyroscope_noise_density: " + repr(worst_gyro_white_noise * np.pi / 180) + " \n")
-yaml_file.write("gyroscope_random_walk: " + repr(worst_gyro_random_walk * np.pi / 180) + " \n")
-yaml_file.write("\n")
-
-print("GYROSCOPE:")
-print(f"X Angle Random Walk: {gyro_wn_intercept_x: .5f} deg/sqrt(s) {gyro_wn_intercept_x * 60: .5f} deg/sqrt(hr)")
-print(f"Y Angle Random Walk: {gyro_wn_intercept_y: .5f} deg/sqrt(s) {gyro_wn_intercept_y * 60: .5f} deg/sqrt(hr)")
-print(f"Z Angle Random Walk: {gyro_wn_intercept_z: .5f} deg/sqrt(s) {gyro_wn_intercept_z * 60: .5f} deg/sqrt(hr)")
-
-print(f"X Bias Instability: {gyro_min_x: .5f} deg/s {gyro_min_x*60*60: .5f} deg/hr")
-print(f"Y Bias Instability: {gyro_min_y: .5f} deg/s {gyro_min_y*60*60: .5f} deg/hr")
-print(f"Z Bias Instability: {gyro_min_z: .5f} deg/s {gyro_min_z*60*60: .5f} deg/hr")
-
-print(f"X Rate Random Walk: {gyro_rr_intercept_x: .5f} deg/s/sqrt(s)")
-print(f"Y Rate Random Walk: {gyro_rr_intercept_y: .5f} deg/s/sqrt(s)")
-print(f"Z Rate Random Walk: {gyro_rr_intercept_z: .5f} deg/s/sqrt(s)")
 
 average_gyro_white_noise = (gyro_wn_intercept_x + gyro_wn_intercept_y + gyro_wn_intercept_z) / 3
 average_gyro_bias_instability = (gyro_min_x + gyro_min_y + gyro_min_z) / 3
 average_gyro_random_walk = (gyro_rr_intercept_x + gyro_rr_intercept_y + gyro_rr_intercept_z) / 3
 
-# Plot gyroscope data
+print("GYROSCOPE:")
+print(f"X Gyro Noise Density: {gyro_wn_intercept_x: .5f} rad/s/sqrt(Hz)")
+print(f"Y Gyro Noise Density: {gyro_wn_intercept_y: .5f} rad/s/sqrt(Hz)")
+print(f"Z Gyro Noise Density: {gyro_wn_intercept_z: .5f} rad/s/sqrt(Hz)")
+print(f"Z Gyro Noise Density Mean: {average_gyro_white_noise: .5f} rad/s/sqrt(Hz)")
+
+print(f"X Gyro Random Walk: {gyro_rr_intercept_x: .5f} rad/s^2/sqrt(Hz)")
+print(f"Y Gyro Random Walk: {gyro_rr_intercept_y: .5f} rad/s^2/sqrt(Hz)")
+print(f"Z Gyro Random Walk: {gyro_rr_intercept_z: .5f} rad/s^2/sqrt(Hz)")
+print(f"Z Gyro Random Walk Mean: {average_gyro_random_walk: .5f} rad/s^2/sqrt(Hz)")
+
+print(f"X Gyro Bias Instability: {gyro_min_x: .5f} rad/s")
+print(f"Y Gyro Bias Instability: {gyro_min_y: .5f} rad/s")
+print(f"Z Gyro Bias Instability: {gyro_min_z: .5f} rad/s")
+print(f"Z Gyro Bias Instability Mean: {average_gyro_bias_instability: .5f} rad/s")
+
+
+
+### plot
+
 fig2 = plt.figure(num="Gyro", dpi=dpi, figsize=figsize)
 
 plt.loglog(period, rotation_rate[:,0], "r-" , label='X')
@@ -293,7 +323,7 @@ fitted_model = generate_prediction(period, q_white=average_gyro_white_noise,
 plt.loglog(period, fitted_model, "-k", label='fitted model')
 
 plt.title("Gyroscope", fontsize=30)
-plt.ylabel("Allan Deviation deg/s", fontsize=30)
+plt.ylabel("Allan Deviation rad/s", fontsize=30)
 plt.legend(fontsize=25)
 plt.grid(True)
 plt.xlabel("Period (s)", fontsize=30)
@@ -304,17 +334,4 @@ plt.pause(1)
 w = plt.waitforbuttonpress(timeout=5)
 plt.close()
 
-fig2.savefig('gyro.png', dpi=600, bbox_inches = "tight")
-
-# Write rostopic and update rate to yaml file
-if args.config:
-	yaml_file.write("rostopic: " + repr(rostopic) + " \n")
-	yaml_file.write("update_rate: " + repr(update_rate) + " \n")
-else:
-	yaml_file.write("rostopic: " + repr(rostopic) + " #Make sure this is correct\n")
-	yaml_file.write("update_rate: " + repr(update_rate) + " #Make sure this is correct\n")
-yaml_file.write("\n")
-yaml_file.close()
-
-print("Writing Kalibr imu.yaml file.")
-print("Make sure to update the rostopic and rate in the file if a config file was not provided.")
+fig2.savefig(os.path.join(fig_dir, 'gyro.png'), dpi=600, bbox_inches = "tight")

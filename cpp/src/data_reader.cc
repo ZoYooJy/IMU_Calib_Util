@@ -20,12 +20,12 @@ namespace allan_variance
 /// 全局运行标志定义
 std::atomic<bool> g_running{true};
 
-DataReader::DataReader(const std::string &imu_file, double imu_rate, int sequence_time)
-    : imu_file_(imu_file), imu_rate_(imu_rate), sequence_time_(sequence_time)
+DataReader::DataReader(const std::string &imu_file, double imu_rate, int sequence_time, InputDataType data_type)
+    : imu_file_(imu_file), imu_rate_(imu_rate), sequence_time_(sequence_time), data_type_(data_type)
 {
 }
 
-bool DataReader::parseLine(const std::string &line, ImuMeasurement &meas)
+bool DataReader::parseLineLSB(const std::string &line, ImuMeasurement &meas)
 {
     // 检查行首是否为 "$IMURAW"
     if (line.size() < 7 || line.substr(0, 7) != "$IMURAW")
@@ -79,8 +79,57 @@ bool DataReader::parseLine(const std::string &line, ImuMeasurement &meas)
 
         // 构造 ImuMeasurement
         meas.t = s2ns(t_sec); // 秒转纳秒
-        meas.I_a_WI = Eigen::Vector3d(acc_x, acc_y, acc_z);
-        meas.I_w_WI = Eigen::Vector3d(gyr_x, gyr_y, gyr_z);
+        meas.a_ib_b = Eigen::Vector3d(acc_x, acc_y, acc_z);
+        meas.w_ib_b = Eigen::Vector3d(gyr_x, gyr_y, gyr_z);
+
+        return true;
+    }
+    catch (const std::exception &e)
+    {
+        APP_ERROR("[WARN] Failed to parse line: " << e.what() << ", content: " << line);
+        return false;
+    }
+}
+
+bool DataReader::parseLineNormal(const std::string &line, ImuMeasurement &meas)
+{
+    // 跳过空行和注释行
+    if (line.empty() || line[0] == '#')
+    {
+        return false;
+    }
+
+    // 按空格分割字段
+    // 格式：t, gyr_x, gyr_y, gyr_z, acc_x, acc_y, acc_z
+    std::vector<std::string> fields;
+    std::stringstream ss(line);
+    std::string field;
+    while (std::getline(ss, field, ' '))
+    {
+        fields.push_back(field);
+    }
+
+    // 需要 7 个字段：t, gyr_x, gyr_y, gyr_z, acc_x, acc_y, acc_z
+    if (fields.size() < 7)
+    {
+        return false;
+    }
+
+    try
+    {
+        double t_sec = std::stod(fields[0]);
+
+        // SI 格式直接是物理量，无需转换
+        double gyr_x = std::stod(fields[1]);
+        double gyr_y = std::stod(fields[2]);
+        double gyr_z = std::stod(fields[3]);
+        double acc_x = std::stod(fields[4]);
+        double acc_y = std::stod(fields[5]);
+        double acc_z = std::stod(fields[6]);
+
+        meas.t = s2ns(t_sec);
+        meas.a_ib_b = Eigen::Vector3d(acc_x, acc_y, acc_z);
+        meas.w_ib_b = Eigen::Vector3d(gyr_x, gyr_y, gyr_z);
 
         return true;
     }
@@ -93,8 +142,6 @@ bool DataReader::parseLine(const std::string &line, ImuMeasurement &meas)
 
 void DataReader::run(EigenVector<ImuMeasurement> &imuBuffer)
 {
-    APP_INFO("[INFO] Processing file: " << imu_file_ << " ...");
-
     std::ifstream file(imu_file_);
     if (!file.is_open())
     {
@@ -122,7 +169,9 @@ void DataReader::run(EigenVector<ImuMeasurement> &imuBuffer)
         }
 
         ImuMeasurement meas;
-        if (!parseLine(line, meas))
+
+        bool ok = (data_type_ == InputDataType::LSB) ? parseLineLSB(line, meas) : parseLineNormal(line, meas);
+        if (!ok)
         {
             continue; // 非数据行或解析失败，跳过
         }
@@ -156,9 +205,9 @@ void DataReader::run(EigenVector<ImuMeasurement> &imuBuffer)
         if (meas.t < lastImuTime)
         {
             skipped_imu++;
-            APP_ERROR("[ERROR] IMU timestamp out of order. Current(ns): " << meas.t - firstTime
-                                                         << " Previous(ns): " << lastImuTime - firstTime << " (dropped "
-                                                         << skipped_imu << ")");
+            APP_ERROR("[ERROR] IMU timestamp out of order. Current(ns): " << meas.t - firstTime << " Previous(ns): "
+                                                                          << lastImuTime - firstTime << " (dropped "
+                                                                          << skipped_imu << ")");
             continue;
         }
         lastImuTime = meas.t;

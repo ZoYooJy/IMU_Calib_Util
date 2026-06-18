@@ -28,27 +28,38 @@ AllanVarianceComputor::AllanVarianceComputor(const std::string &config_file, con
     // 加载 YAML 配置文件
     YAML::Node node = loadYamlFile(config_file);
 
+    int data_type;
+
     // 读取配置参数
     get(node, "imu_rate", imu_rate_);
-    APP_INFO("[INFO] imu_rate: " << imu_rate_);
     get(node, "sequence_time", sequence_time_);
-    APP_INFO("[INFO] sequence_time: " << sequence_time_);
     get(node, "overlap", overlap_);
-    APP_INFO("[INFO] overlap: " << overlap_);
+    get(node, "data_type", data_type);
+
+    if (input_type_map.find(data_type) != input_type_map.end())
+    {
+        data_type_ = input_type_map.at(data_type);
+    }
+    else
+    {
+        data_type_ = InputDataType::LSB; // default
+    }
 
     // 设置输出文件路径
     imu_output_file_ = output_path + "/" + "allan_variance" + ".csv";
+
+    APP_INFO("[INFO] imu_rate: " << imu_rate_);
+    APP_INFO("[INFO] sequence_time: " << sequence_time_);
+    APP_INFO("[INFO] overlap: " << overlap_);
+    APP_INFO("[INFO] data_type: " << data_type);
+    APP_INFO("[INFO] output file path: " << imu_output_file_);
 }
 
 void AllanVarianceComputor::run(const std::string &imu_file)
 {
-    APP_INFO("[INFO] Processing " << imu_file << " ...");
-
-    // 打开输出文件
     av_output_ = std::ofstream(imu_output_file_.c_str(), std::ofstream::out);
 
-    // 使用 DataReader 读取 IMU 数据文件
-    DataReader reader(imu_file, imu_rate_, sequence_time_);
+    DataReader reader(imu_file, imu_rate_, sequence_time_, data_type_);
     reader.run(imuBuffer_);
 
     // 计算 Allan 方差
@@ -128,14 +139,14 @@ void AllanVarianceComputor::allanVariance()
                         for (int m = 0; m < max_bin_size; m++)
                         {
                             // 加速度（m/s²）
-                            current_average[0] += imuBuffer_[j + m].I_a_WI[0];
-                            current_average[1] += imuBuffer_[j + m].I_a_WI[1];
-                            current_average[2] += imuBuffer_[j + m].I_a_WI[2];
+                            current_average[0] += imuBuffer_[j + m].a_ib_b[0];
+                            current_average[1] += imuBuffer_[j + m].a_ib_b[1];
+                            current_average[2] += imuBuffer_[j + m].a_ib_b[2];
 
-                            // 角速度（rad/s → deg/s）
-                            current_average[3] += imuBuffer_[j + m].I_w_WI[0] * 180 / M_PI;
-                            current_average[4] += imuBuffer_[j + m].I_w_WI[1] * 180 / M_PI;
-                            current_average[5] += imuBuffer_[j + m].I_w_WI[2] * 180 / M_PI;
+                            // 角速度（rad/s）
+                            current_average[3] += imuBuffer_[j + m].w_ib_b[0];
+                            current_average[4] += imuBuffer_[j + m].w_ib_b[1];
+                            current_average[5] += imuBuffer_[j + m].w_ib_b[2];
                         }
 
                         // 求均值
@@ -152,7 +163,7 @@ void AllanVarianceComputor::allanVariance()
 
                     int num_averages = static_cast<int>(averages.size());
                     APP_INFO("[INFO] Period " << period_time << "s: computed " << num_averages << " bin averages ("
-                              << (period_max - period - 1) << " periods remaining)");
+                                              << (period_max - period - 1) << " periods remaining)");
 
                     local_map.insert({period, averages});
                 }
@@ -192,7 +203,7 @@ void AllanVarianceComputor::allanVariance()
         double period_time = period * 0.1; // 采样周期（秒）
         int num_averages = static_cast<int>(averages.size());
         APP_INFO("[INFO] Period " << period_time << "s: " << num_averages << " bins, " << imuBuffer_.size()
-                  << " measurements total");
+                                  << " measurements total");
 
         // 计算 Allan 方差：σ²(τ) = 1/(2(N-1)) * Σ(ā_{k+1} - ā_k)²
         std::vector<double> allan_variance = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
