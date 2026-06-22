@@ -4,31 +4,55 @@ project(allan_variance_calib)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find dependencies
-set(EIGEN3_INCLUDE_DIR "/opt/homebrew/Cellar/eigen/3.4.0_1/include/eigen3")
-set(YAML_CPP_INCLUDE_DIR "/opt/homebrew/Cellar/yaml-cpp/0.8.0/include")
-set(YAML_CPP_LIBRARY "/opt/homebrew/Cellar/yaml-cpp/0.8.0/lib/libyaml-cpp.dylib")
-
 # Compiler flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -Wuninitialized")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -fno-omit-frame-pointer")
 
-# Include directories
-include_directories(
-  include
-  ${EIGEN3_INCLUDE_DIR}
-  ${YAML_CPP_INCLUDE_DIR}
-)
+# ── Eigen ──────────────────────────────────────────────────
+list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew/opt/eigen")
+find_package(Eigen3 QUIET CONFIG)
+if(Eigen3_FOUND)
+    message(STATUS "[Eigen3] found via find_package: ${Eigen3_DIR}")
+else()
+    message(STATUS "[Eigen3] NOT found via find_package, using manual path")
+    set(EIGEN3_INCLUDE_DIR "/opt/homebrew/Cellar/eigen/3.4.0_1/include/eigen3")
+endif()
 
-# Library
-add_library(${PROJECT_NAME}_lib
+# ── yaml-cpp ──────────────────────────────────────────────
+find_package(yaml-cpp QUIET)
+if(yaml-cpp_FOUND)
+    message(STATUS "[yaml-cpp] found via find_package: ${yaml-cpp_DIR}")
+else()
+    message(STATUS "[yaml-cpp] NOT found via find_package, using manual path")
+    set(YAML_CPP_INCLUDE_DIR "/opt/homebrew/Cellar/yaml-cpp/0.8.0/include")
+    set(YAML_CPP_LIBRARY "/opt/homebrew/Cellar/yaml-cpp/0.8.0/lib/libyaml-cpp.dylib")
+endif()
+
+
+# Executable
+add_executable(${PROJECT_NAME}
     src/yaml_parser.cc
     src/data_reader.cc
     src/imu_meas.cc
     src/allan_variance_computor.cc
+    src/main.cc
 )
-target_link_libraries(${PROJECT_NAME}_lib ${YAML_CPP_LIBRARY})
 
-# Executable
-add_executable(${PROJECT_NAME} src/main.cc)
-target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_lib ${YAML_CPP_LIBRARY})
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+# 链接 Eigen
+if(Eigen3_FOUND)
+    target_link_libraries(${PROJECT_NAME} PRIVATE Eigen3::Eigen)
+else()
+    target_include_directories(${PROJECT_NAME} PRIVATE ${EIGEN3_INCLUDE_DIR})
+endif()
+
+# 链接 yaml-cpp
+if(yaml-cpp_FOUND)
+    target_link_libraries(${PROJECT_NAME} PRIVATE yaml-cpp::yaml-cpp)
+else()
+    target_include_directories(${PROJECT_NAME} PRIVATE ${YAML_CPP_INCLUDE_DIR})
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${YAML_CPP_LIBRARY})
+endif()
