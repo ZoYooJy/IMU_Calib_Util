@@ -162,8 +162,8 @@ void AllanVarianceComputor::allanVariance()
                     }
 
                     int num_averages = static_cast<int>(averages.size());
-                    APP_INFO("[INFO] Period " << period_time << "s: computed " << num_averages << " bin averages ("
-                                              << (period_max - period - 1) << " periods remaining)");
+                    // APP_INFO("[INFO] Period " << period_time << "s: computed " << num_averages << " bin averages ("
+                    //                           << (period_max - period - 1) << " periods remaining)");
 
                     local_map.insert({period, averages});
                 }
@@ -202,8 +202,8 @@ void AllanVarianceComputor::allanVariance()
         std::vector<std::vector<double>> averages = averages_map.at(period);
         double period_time = period * 0.1; // 采样周期（秒）
         int num_averages = static_cast<int>(averages.size());
-        APP_INFO("[INFO] Period " << period_time << "s: " << num_averages << " bins, " << imuBuffer_.size()
-                                  << " measurements total");
+        // APP_INFO("[INFO] Period " << period_time << "s: " << num_averages << " bins, " << imuBuffer_.size()
+        //                           << " measurements total");
 
         // 计算 Allan 方差：σ²(τ) = 1/(2(N-1)) * Σ(ā_{k+1} - ā_k)²
         std::vector<double> allan_variance = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};

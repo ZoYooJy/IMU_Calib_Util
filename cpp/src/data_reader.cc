@@ -22,8 +22,7 @@ std::atomic<bool> g_running{true};
 
 DataReader::DataReader(const std::string &imu_file, double imu_rate, int sequence_time, InputDataType data_type)
     : imu_file_(imu_file), imu_rate_(imu_rate), sequence_time_(sequence_time), data_type_(data_type)
-{
-}
+{}
 
 bool DataReader::parseLineLSB(const std::string &line, ImuMeasurement &meas)
 {
@@ -140,13 +139,70 @@ bool DataReader::parseLineNormal(const std::string &line, ImuMeasurement &meas)
     }
 }
 
+bool DataReader::parseLineBin(const double *_line, ImuMeasurement &_meas)
+{
+    double t = _line[0];
+
+    _meas.t_ = s2ns(t);
+    _meas.w_ib_b_ = Eigen::Vector3d(_line[0], _line[1], _line[2]);
+    _meas.a_ib_b_ = Eigen::Vector3d(_line[3], _line[4], _line[5]);
+
+    return true;
+}
+
 void DataReader::run(EigenVector<ImuMeasurement> &_imu_buffer)
 {
-    std::ifstream file(imu_file_);
+    const bool is_bin = (data_type_ == InputDataType::BIN);
+
+    std::ifstream file(imu_file_, is_bin ? std::ios::binary : std::ios::in);
     if (!file.is_open())
     {
         APP_ERROR("[ERROR] Cannot open IMU data file: " << imu_file_);
         return;
+    }
+
+    std::string line;
+    double line_bin[7];
+
+    bool (DataReader::*parseFuncText)(const std::string &, ImuMeasurement &) = nullptr;
+    switch (data_type_)
+    {
+        case InputDataType::LSB: {
+            parseFuncText = &DataReader::parseLineLSB;
+            break;
+        }
+        case InputDataType::NORMAL: {
+            parseFuncText = &DataReader::parseLineNormal;
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+
+    auto get_meas_text = [&](ImuMeasurement &_meas) -> bool {
+        while (std::getline(file, line))
+        {
+            if ((this->*parseFuncText)(line, _meas))
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    auto get_meas_bin = [&](ImuMeasurement &_meas) -> bool {
+        return file.read(reinterpret_cast<char *>(line_bin), 7 * sizeof(double)) && parseLineBin(line_bin, _meas);
+    };
+
+    std::function<bool(ImuMeasurement &)> get_meas;
+    if (is_bin)
+    {
+        get_meas = get_meas_bin;
+    }
+    else
+    {
+        get_meas = get_meas_text;
     }
 
     int imu_counter = 0;      // 已读取的 IMU 消息计数
@@ -155,10 +211,11 @@ void DataReader::run(EigenVector<ImuMeasurement> &_imu_buffer)
     uint64_t firstTime = 0;   // 第一条消息的时间戳（纳秒）
     uint64_t lastImuTime = 0; // 上一条消息的时间戳（纳秒）
 
-    std::clock_t start = std::clock(); // 进度打印计时器
-    std::string line;
+    ImuMeasurement meas;
 
-    while (std::getline(file, line))
+    std::clock_t start = std::clock(); // 进度打印计时器
+
+    while (get_meas(meas))
     {
         // 检查全局运行标志
         if (!g_running.load())
@@ -166,14 +223,6 @@ void DataReader::run(EigenVector<ImuMeasurement> &_imu_buffer)
             APP_ERROR("[ERROR] Stop signal received, closing file!");
             file.close();
             return;
-        }
-
-        ImuMeasurement meas;
-
-        bool ok = (data_type_ == InputDataType::LSB) ? parseLineLSB(line, meas) : parseLineNormal(line, meas);
-        if (!ok)
-        {
-            continue; // 非数据行或解析失败，跳过
         }
 
         imu_counter++;

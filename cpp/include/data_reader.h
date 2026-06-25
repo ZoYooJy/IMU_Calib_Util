@@ -2,7 +2,7 @@
  * @Author: ZoYooJy zhouyujie_gdut@163.com
  * @Date: 2026-06-17 11:34:58
  * @LastEditors: ZoYooJy zhouyujie_gdut@163.com
- * @LastEditTime: 2026-06-18 15:49:51
+ * @LastEditTime: 2026-06-25 17:07:51
  * @FilePath: /IMU_Calib_Util/cpp/include/data_reader.h
  */
 #pragma once
@@ -60,6 +60,15 @@ class DataReader
      * @return 是否解析成功
      */
     bool parseLineNormal(const std::string &_line, ImuMeasurement &_meas);
+
+    /**
+     * @brief 格式: t, gyr_x, gyr_y, gyr_z, acc_x, acc_y, acc_z [rad/s, m/s^2]
+     *
+     * @param _line
+     * @param _meas
+     * @return
+     */
+    bool parseLineBin(const double *_line, ImuMeasurement &_meas);
 
     std::string imu_file_; ///< IMU 数据文件路径
     double imu_rate_;      ///< IMU 采样频率（Hz）
